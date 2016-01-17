@@ -3,7 +3,7 @@
   Plugin Name: eBook Display
   Plugin URI: https://github.com/robogeek/wp-ebook-display
   Description: Display EPUB eBook content on a Wordpress site
-  Version: 0.1.1
+  Version: 0.1.2
   Author: David Herron
   License: GPLv2 or later
 
@@ -27,7 +27,7 @@ add_action( 'init', 'ebookdisplay_init' );
 /**
  * Initialize the ebook_page post type and other initializaton
  */
-function ebookmaker_init() {
+function ebookdisplay_init() {
     
     register_post_type( 'ebook_displayer',
     array(
@@ -57,21 +57,21 @@ function ebookmaker_init() {
     
 }
 
-function ebookmaker_upload_field()
+function ebookdisplay_upload_field()
 {
-    echo '<input type="file" name="ebookmaker_upload_field" />';
+    echo '<input type="file" name="ebookdisplay_upload_field" />';
 }
 add_action('init', create_function('',
-    'add_meta_box("ebookmaker_upload_field", "Upload File", "ebookmaker_upload_field", "post");'));
+    'add_meta_box("ebookdisplay_upload_field", "Upload File", "ebookdisplay_upload_field", "post");'));
 
-function ebookmaker_handle_upload_field($post_ID, $post)
+function ebookdisplay_handle_upload_field($post_ID, $post)
 {
-    if (!empty($_FILES['ebookmaker_upload_field']['name'])) {
-        $upload = wp_handle_upload($_FILES['ebookmaker_upload_field']);
+    if (!empty($_FILES['ebookdisplay_upload_field']['name'])) {
+        $upload = wp_handle_upload($_FILES['ebookdisplay_upload_field']);
         if (!isset($upload['error'])) {
             // no errors, do what you like
         }
     }
 }
-add_action('wp_insert_post', 'ebookmaker_handle_upload_field', 10, 2);
+add_action('wp_insert_post', 'ebookdisplay_handle_upload_field', 10, 2);
 
