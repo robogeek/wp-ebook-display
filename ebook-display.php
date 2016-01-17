@@ -3,7 +3,7 @@
   Plugin Name: eBook Display
   Plugin URI: https://github.com/robogeek/wp-ebook-display
   Description: Display EPUB eBook content on a Wordpress site
-  Version: 0.1.3
+  Version: 0.1.4
   Author: David Herron
   License: GPLv2 or later
 
@@ -57,13 +57,14 @@ function ebookdisplay_init() {
     
 }
 
-if ( ! function_exists( 'add_meta_box' ) ) require_once( ABSPATH . 'wp-admin/includes/template.php' );
-
 function ebookdisplay_upload_field() {
     echo '<input type="file" name="ebookdisplay_upload_field" />';
 }
-add_action('init', create_function('',
-    'add_meta_box("ebookdisplay_upload_field", "Upload File", "ebookdisplay_upload_field", "post");'));
+
+function ebookdisplay_add_metaboxes() {
+    add_meta_box("ebookdisplay_upload_field", "Upload File", "ebookdisplay_upload_field", "post");
+}
+add_action( 'add_meta_boxes', 'ebookdisplay_add_metaboxes', 10, 2 );
 
 function ebookdisplay_handle_upload_field($post_ID, $post) {
     if (!empty($_FILES['ebookdisplay_upload_field']['name'])) {
