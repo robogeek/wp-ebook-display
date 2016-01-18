@@ -3,7 +3,7 @@
   Plugin Name: eBook Display
   Plugin URI: https://github.com/robogeek/wp-ebook-display
   Description: Display EPUB eBook content on a Wordpress site
-  Version: 0.1.4
+  Version: 0.1.5
   Author: David Herron
   License: GPLv2 or later
 
@@ -57,34 +57,120 @@ function ebookdisplay_init() {
     
 }
 
+add_action('post_edit_form_tag', 'post_edit_form_tag');
+function post_edit_form_tag() {
+    echo ' enctype="multipart/form-data"';
+}
+
 function ebookdisplay_upload_field() {
-    echo '<input type="file" name="ebookdisplay_upload_field" />';
+    wp_nonce_field(plugin_basename(__FILE__), 'ebookdisplay_upload_field_nonce');
+    echo '<input type="file" id="ebookdisplay_upload_field" name="ebookdisplay_upload_field" />';
 }
 
 function ebookdisplay_add_metaboxes() {
-    add_meta_box("ebookdisplay_upload_field", "Upload eBook to display", "ebookdisplay_upload_field", "ebook_displayer", 'side');
+    add_meta_box("ebookdisplay_upload_field", "Upload eBook to display",
+                 "ebookdisplay_upload_field", "ebook_displayer",
+                 'normal', 'high');
 }
 add_action('add_meta_boxes', 'ebookdisplay_add_metaboxes', 10, 2);
 
-function ebookdisplay_handle_upload_field($post_ID, $post) {
-    if (!empty($_FILES['ebookdisplay_upload_field']['name'])) {
-        $upload = wp_handle_upload($_FILES['ebookdisplay_upload_field']);
-        if (!isset($upload['error'])) {
-            if (!add_post_meta($post_ID, 'ebook_path', $upload['file'], true)) {
-               update_post_meta($post_ID, 'ebook_path', $upload['file']);
-            }
-            if (!add_post_meta($post_ID, 'ebook_url', $upload['url'], true)) {
-               update_post_meta($post_ID, 'ebook_url', $upload['url']);
-            }
-            if (!add_post_meta($post_ID, 'ebook_mimetype', $upload['type'], true)) {
-               update_post_meta($post_ID, 'ebook_mimetype', $upload['type']);
-            }
-        } else {
-            error_log($upload['error']);
-        }
+function ebookdisplay_save_custom_meta_data($id) {
+ 
+    /* --- security verification --- */
+    if(!wp_verify_nonce($_POST['ebookdisplay_upload_field_nonce'], plugin_basename(__FILE__))) {
+      return $id;
+    } // end if
+       
+    if(defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+      return $id;
+    } // end if
+       
+    if('page' == $_POST['post_type']) {
+      if(!current_user_can('edit_page', $id)) {
+        return $id;
+      } // end if
     } else {
-        error_log('empty $_FILES ebookdisplay_upload_field name');
-    }
-}
-add_action('wp_insert_post', 'ebookdisplay_handle_upload_field', 10, 2);
-
+        if(!current_user_can('edit_page', $id)) {
+            return $id;
+        } // end if
+    } // end if
+    /* - end security verification - */
+    
+    if(!empty($_FILES['ebookdisplay_upload_field']['name'])) {
+         
+        foreach ($_FILES['ebookdisplay_upload_field'] as $key => $value) {
+            error_log('TRACE $_FILES["ebookdisplay_upload_field"]   '. $key .' => '. $value);
+        }
+        
+        // This required installing the WP Extra Types plugin and tick the box for .epub
+        // How to enable .epub upload w/o requiring that plugin
+        
+        // Should be possible to use plupload
+        
+        // How to make the form display the uploaded file?
+        // When that function is executed there's probably a global variable for post ID
+        // Hence can use that variable to find the post meta and build the form appropriately
+        
+        // If $_FILES has an uploadable file it indicates a new file is being uploaded
+        // Hence, if an existing file is attached then it should be deleted beforehand
+        
+        // Setup the array of supported file types. In this case, it's just EPUB.
+        $supported_types = array('application/epub+zip');
+         
+        // Get the file type of the upload
+        // Check if the type is supported. If not, throw an error.
+        if(in_array($_FILES['ebookdisplay_upload_field']['type'], $supported_types)) {
+ 
+            // Use the WordPress API to upload the file
+            $upload = wp_upload_bits($_FILES['ebookdisplay_upload_field']['name'], null,
+                   file_get_contents($_FILES['ebookdisplay_upload_field']['tmp_name']));
+     
+            if(isset($upload['error']) && $upload['error'] != 0) {
+                wp_die('There was an error uploading your file. The error is: ' . $upload['error']);
+            } else {
+                
+                if (!add_post_meta($id, 'ebook_path', $upload['file'], true)) {
+                   update_post_meta($id, 'ebook_path', $upload['file']);
+                }
+                if (!add_post_meta($id, 'ebook_url', $upload['url'], true)) {
+                   update_post_meta($id, 'ebook_url', $upload['url']);
+                }
+                if (!add_post_meta($id, 'ebook_mimetype', $upload['type'], true)) {
+                   update_post_meta($id, 'ebook_mimetype', $upload['type']);
+                }
+                
+                // Now that we've got the file uploaded, extract its contents
+                
+                $path_parts = pathinfo($upload['file']);
+                $extract_to = $path_parts['dirname'] .'/'. $path_parts['filename'];
+                
+                $zip = new ZipArchive;
+                $res = $zip->open($upload['file']);
+                if ($res === TRUE) {
+                  // extract it to the path we determined above
+                  $zip->extractTo($extract_to);
+                  $zip->close();
+                  // echo "WOOT! $file extracted to $path";
+                } else {
+                  error_log("Doh! I couldn't open ". $upload['file']);
+                }
+                
+                if (!add_post_meta($id, 'ebook_extracted', $extract_to, true)) {
+                   update_post_meta($id, 'ebook_extracted', $extract_to);
+                }
+                
+            } // end if/else
+ 
+        } else {
+            error_log("The file type that you've uploaded is not an EPUB.");
+        } // end if/else
+         
+    } else {
+        error_log('ebookdisplay_save_custom_meta_data: empty $_FILES ebookdisplay_upload_field name');
+        // error_log(print_r($_FILES));
+    } // end if
+     
+    
+    
+} // end save_custom_meta_data
+add_action('save_post', 'ebookdisplay_save_custom_meta_data');
