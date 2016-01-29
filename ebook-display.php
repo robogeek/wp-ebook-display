@@ -22,11 +22,10 @@
 */
 
 
-add_action( 'init', 'ebookdisplay_init' );
-
 /**
  * Initialize the ebook_page post type and other initializaton
  */
+add_action( 'init', 'ebookdisplay_init' );
 function ebookdisplay_init() {
     
     register_post_type('ebook_displayer',
@@ -45,6 +44,7 @@ function ebookdisplay_init() {
             'not_found'          => __('No books found.', 'your-plugin-textdomain'),
             'not_found_in_trash' => __('No books found in Trash.', 'your-plugin-textdomain')
         ),
+        'publicly_queryable' => true,
         'public'         => true,
         'has_archive'    => true,
         'rewrite'        => array('slug' => 'ebook', 'feeds' => false, 'with_front' => true),
@@ -53,9 +53,40 @@ function ebookdisplay_init() {
 		'show_ui'        => true,
 		'taxonomies'     => array('post_tag')
     )
-  );
+    );
+    
+    /*
+    $displayers = new WP_Query(array(
+        'post_type' => 'ebook_displayer'
+    ));
+    
+    if ($displayers->have_posts()) {
+    	while ($displayers->have_posts()) {
+		    $displayers->the_post();
+    	    $permlink = get_permalink(get_the_ID());
+    	    add_rewrite_rule('^'. $permlink .'/(.*)$', 'index.php?page_id='. get_the_ID() .'&bookasset=$matches[2]', 'top');
+    	}
+    }
+    wp_reset_postdata();
+    
+    // So that bookasset is recognized from the rewrite rule
+    add_rewrite_tag('%bookasset%', '([^&]+)');
+    */
+    
+/*   for all posts type=== ebook_displayer
+    add_rewrite_rule('^ebookdisplay/...POST ID.../(.*)/?','index.php?page_id=$matches[1]&bookasset=$matches[2]','top'); */
     
 }
+
+// http://wordpress.stackexchange.com/questions/3396/create-custom-page-templates-with-plugins
+// https://codex.wordpress.org/Plugin_API/Filter_Reference/page_template
+/* add_filter('page_template', 'ebookdisplay_page_template');
+function ebookdisplay_page_template($page_template) {
+    if (get_post_type(get_the_ID()) == 'ebook_displayer') {
+        $page_template = dirname( __FILE__ ) . '/ebook-display-template.php';
+    }
+    return $page_template;
+} */
 
 /*
  * Fix the ebook_displayer post edit form so it sends multipart/form-data.
