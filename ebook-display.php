@@ -57,27 +57,61 @@ function ebookdisplay_init() {
     
 }
 
-add_action('post_edit_form_tag', 'post_edit_form_tag');
-function post_edit_form_tag() {
-    echo ' enctype="multipart/form-data"';
+/*
+ * Fix the ebook_displayer post edit form so it sends multipart/form-data.
+ * Doing this enables file upload.
+ */
+add_action('post_edit_form_tag', 'ebookdisplay_post_edit_form_tag');
+function ebookdisplay_post_edit_form_tag($post) {
+    // $post is passed when the action is triggered
+    // Ensure this triggers only for ebook_displayer posts
+    if ($post->post_type == 'ebook_displayer') {
+        echo ' enctype="multipart/form-data"';
+    }
 }
 
-function ebookdisplay_upload_field() {
-    wp_nonce_field(plugin_basename(__FILE__), 'ebookdisplay_upload_field_nonce');
-    echo '<input type="file" id="ebookdisplay_upload_field" name="ebookdisplay_upload_field" />';
+function ebookdisplay_upload_field($post) {
+    // Ensure this triggers only for ebook_displayer posts
+    if ($post->post_type == 'ebook_displayer') {
+        
+        $ebook_path = get_post_meta($post->ID, 'ebook_path', true);
+        $ebook_url = get_post_meta($post->ID, 'ebook_url', true);
+        $ebook_mimetype = get_post_meta($post->ID, 'ebook_mimetype', true);
+        $ebook_extracted = get_post_meta($post->ID, 'ebook_extracted', true);
+        
+        // Display for the user the currently uploaded file
+        if (!empty($ebook_path))      { ?><p>ebook_path      = <?php echo esc_html($ebook_path); ?></p><?php }
+        if (!empty($ebook_url))       { ?><p>ebook_url       = <?php echo esc_html($ebook_url); ?></p><?php }
+        if (!empty($ebook_mimetype))  { ?><p>ebook_mimetype  = <?php echo esc_html($ebook_mimetype); ?></p><?php }
+        if (!empty($ebook_extracted)) { ?><p>ebook_extracted = <?php echo esc_html($ebook_extracted); ?></p><?php }
+        
+        if (!empty($ebook_path) && !empty($ebook_url) && !empty($ebook_mimetype) && !empty($ebook_extracted)) {
+            ?><p>Uploading a new file will delete the existing file.</p><?php
+        }
+        
+        // Display the input fields.
+        wp_nonce_field(plugin_basename(__FILE__), 'ebookdisplay_upload_field_nonce');
+        echo '<input type="file" id="ebookdisplay_upload_field" name="ebookdisplay_upload_field" />';
+    }
 }
 
-function ebookdisplay_add_metaboxes() {
-    add_meta_box("ebookdisplay_upload_field", "Upload eBook to display",
-                 "ebookdisplay_upload_field", "ebook_displayer",
-                 'normal', 'high');
+function ebookdisplay_add_metaboxes($post_type, $post) {
+    // Ensure this triggers only for ebook_displayer posts
+    if ($post->post_type == 'ebook_displayer') {
+        add_meta_box("ebookdisplay_upload_field", "Upload eBook to display",
+                     "ebookdisplay_upload_field", "ebook_displayer",
+                     'normal', 'high');
+    }
 }
 add_action('add_meta_boxes', 'ebookdisplay_add_metaboxes', 10, 2);
 
 function ebookdisplay_save_custom_meta_data($id) {
  
     /* --- security verification --- */
-    if(!wp_verify_nonce($_POST['ebookdisplay_upload_field_nonce'], plugin_basename(__FILE__))) {
+    // Without the array_key_exists check, an error was displayed
+    // for posts types other than ebook_displayer
+    if(!array_key_exists('ebookdisplay_upload_field_nonce', $_POST)
+    || !wp_verify_nonce($_POST['ebookdisplay_upload_field_nonce'], plugin_basename(__FILE__))) {
       return $id;
     } // end if
        
@@ -103,16 +137,16 @@ function ebookdisplay_save_custom_meta_data($id) {
         }
         
         // This required installing the WP Extra Types plugin and tick the box for .epub
-        // How to enable .epub upload w/o requiring that plugin
+        // TODO How to enable .epub upload w/o requiring that plugin
         
-        // Should be possible to use plupload
+        // TODO Should be possible to use plupload
         
-        // How to make the form display the uploaded file?
+        // TODO How to make the form display the uploaded file?
         // When that function is executed there's probably a global variable for post ID
         // Hence can use that variable to find the post meta and build the form appropriately
         
-        // If $_FILES has an uploadable file it indicates a new file is being uploaded
-        // Hence, if an existing file is attached then it should be deleted beforehand
+        // TODO If $_FILES has an uploadable file it indicates a new file is being uploaded
+        // TODO Hence, if an existing file is attached then it should be deleted beforehand
         
         // Setup the array of supported file types. In this case, it's just EPUB.
         $supported_types = array('application/epub+zip');
@@ -128,6 +162,19 @@ function ebookdisplay_save_custom_meta_data($id) {
             if(isset($upload['error']) && $upload['error'] != 0) {
                 wp_die('There was an error uploading your file. The error is: ' . $upload['error']);
             } else {
+                
+                $ebook_path = get_post_meta($id, 'ebook_path', true);
+                $ebook_url = get_post_meta($id, 'ebook_url', true);
+                $ebook_mimetype = get_post_meta($id, 'ebook_mimetype', true);
+                $ebook_extracted = get_post_meta($id, 'ebook_extracted', true);
+                
+                if (!empty($ebook_path)) {
+                    unlink($ebook_path);
+                }
+                
+                if (!empty($ebook_extracted)) {
+                    ebookdisplay_rrmdir($ebook_extracted);
+                }
                 
                 if (!add_post_meta($id, 'ebook_path', $upload['file'], true)) {
                    update_post_meta($id, 'ebook_path', $upload['file']);
@@ -174,3 +221,20 @@ function ebookdisplay_save_custom_meta_data($id) {
     
 } // end save_custom_meta_data
 add_action('save_post', 'ebookdisplay_save_custom_meta_data');
+
+// http://www.php.net/rmdir
+// http://stackoverflow.com/questions/3338123/how-do-i-recursively-delete-a-directory-and-its-entire-contents-files-sub-dir
+function ebookdisplay_rrmdir($dir) {
+    if (is_dir($dir)) {
+        $objects = scandir($dir);
+        foreach ($objects as $object) {
+            if ($object != "." && $object != "..") {
+                if (is_dir($dir."/".$object))
+                    ebookdisplay_rrmdir($dir."/".$object);
+                else
+                    unlink($dir."/".$object);
+            }
+        }
+        rmdir($dir);
+    }
+}
