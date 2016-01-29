@@ -141,12 +141,7 @@ function ebookdisplay_save_custom_meta_data($id) {
         
         // TODO Should be possible to use plupload
         
-        // TODO How to make the form display the uploaded file?
-        // When that function is executed there's probably a global variable for post ID
-        // Hence can use that variable to find the post meta and build the form appropriately
-        
-        // TODO If $_FILES has an uploadable file it indicates a new file is being uploaded
-        // TODO Hence, if an existing file is attached then it should be deleted beforehand
+        // TODO set up display of eBook content
         
         // Setup the array of supported file types. In this case, it's just EPUB.
         $supported_types = array('application/epub+zip');
