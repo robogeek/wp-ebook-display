@@ -165,10 +165,17 @@ function ebookdisplay_save_custom_meta_data($id) {
                 
                 if (!empty($ebook_path)) {
                     unlink($ebook_path);
+                    delete_post_meta($id, 'ebook_path');
                 }
-                
+                if (!empty($ebook_url)) {
+                    delete_post_meta($id, 'ebook_url');
+                }
+                if (!empty($ebook_mimetype)) {
+                    delete_post_meta($id, 'ebook_mimetype');
+                }
                 if (!empty($ebook_extracted)) {
                     ebookdisplay_rrmdir($ebook_extracted);
+                    delete_post_meta($id, 'ebook_extracted');
                 }
                 
                 if (!add_post_meta($id, 'ebook_path', $upload['file'], true)) {
